@@ -1,0 +1,431 @@
+package com.mchenys.pluginloader.core;
+
+import android.app.Application;
+import android.app.Instrumentation;
+import android.content.ComponentName;
+import android.content.ContentResolver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.content.res.AssetManager;
+import android.content.res.Resources;
+import android.os.Build;
+
+import com.mchenys.pluginloader.utils.DexUtil;
+import com.mchenys.pluginloader.utils.PluginUtil;
+import com.mchenys.pluginloader.utils.ReflectUtils;
+import com.mchenys.pluginloader.utils.RunUtils;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import dalvik.system.DexClassLoader;
+
+/**
+ * @Author: mChenys
+ * @Date: 2021/5/11
+ * @Description: 已加载的插件包封装
+ */
+public class LoadedPlugin {
+    public static final String TAG = Constants.TAG_PREFIX + "LoadedPlugin";
+
+    private final String mLocation;
+    private PluginManager mPluginManager;
+    private Context mHostContext;
+    private Context mPluginContext;
+    private final File mNativeLibDir;
+    private final Object mPackage; // PackageParser.Package
+    private final PackageInfo mPackageInfo;
+    private Resources mResources;
+    private ClassLoader mClassLoader;
+    private Application mApplication; // 插件的Application
+    private Intent mLaunchIntent;
+    private Map<ComponentName, ActivityInfo> mActivityInfos; // 插件包的ActivityInfo
+
+    public LoadedPlugin(PluginManager pluginManager, Context context, File apk) throws Exception {
+        this.mPluginManager = pluginManager;
+        this.mHostContext = context;
+        this.mLocation = apk.getAbsolutePath();
+        this.mPackage = PackageParserCompat.parsePackage(context, apk, PackageParserCompat.PARSE_MUST_BE_APK);
+        this.mPackageInfo = getPackageInfo(context, apk);
+        this.mPluginContext = createPluginContext(null);
+        this.mNativeLibDir = getDir(context, Constants.NATIVE_DIR);
+        this.mResources = createResources(context, apk);
+        this.mClassLoader = createClassLoader(context, apk, this.mNativeLibDir, context.getClassLoader());
+        this.mLaunchIntent = getLaunchIntent();
+        this.mActivityInfos = getActivityInfo(mPackageInfo);
+        tryToCopyNativeLib(apk);
+        invokeApplication();
+    }
+
+
+    /**
+     * 获取插件包的PackageInfo
+     *
+     * @param context
+     * @param apk
+     * @return
+     * @throws Exception
+     */
+    private PackageInfo getPackageInfo(Context context, File apk) throws Exception {
+        return context.getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(), PackageManager.GET_ACTIVITIES |
+                PackageManager.GET_SERVICES);
+    }
+
+
+    private File getDir(Context context, String name) {
+        return context.getDir(name, Context.MODE_PRIVATE);
+    }
+
+    /**
+     * 创建插件ClassLoader
+     *
+     * @param context
+     * @param apk
+     * @param libsDir
+     * @param parent
+     * @return
+     * @throws Exception
+     */
+    private ClassLoader createClassLoader(Context context, File apk, File libsDir, ClassLoader parent) throws Exception {
+        File dexOutputDir = getDir(context, Constants.OPTIMIZE_DIR);
+        String dexOutputPath = dexOutputDir.getAbsolutePath();
+        DexClassLoader pluginClassLoader = new DexClassLoader(apk.getAbsolutePath(), dexOutputPath, libsDir.getAbsolutePath(), parent);
+
+        if (Constants.COMBINE_CLASSLOADER) {
+            DexUtil.insertDex(pluginClassLoader, parent, libsDir);
+        }
+        return pluginClassLoader;
+    }
+
+    /**
+     * 创建插件AssetManager
+     *
+     * @param apk
+     * @return
+     * @throws Exception
+     */
+    private AssetManager createAssetManager(File apk) throws Exception {
+        AssetManager am = AssetManager.class.newInstance();
+        ReflectUtils.invokeMethod(am, "addAssetPath", new Class[]{String.class}, apk.getAbsolutePath());
+        return am;
+    }
+
+    /**
+     * 创建插件Resources
+     *
+     * @param context
+     * @param apk
+     * @return
+     * @throws Exception
+     */
+    private Resources createResources(Context context, File apk) throws Exception {
+        if (Constants.COMBINE_RESOURCES) {
+            // 合并资源
+            return ResourcesManager.createMergeResources(context, apk);
+        } else {
+            // 返回插件的资源
+            Resources hostResources = context.getResources();
+            AssetManager assetManager = createAssetManager(apk);
+            return new Resources(assetManager, hostResources.getDisplayMetrics(), hostResources.getConfiguration());
+        }
+    }
+
+    /**
+     * 赋值so
+     *
+     * @param apk
+     * @throws Exception
+     */
+    private void tryToCopyNativeLib(File apk) throws Exception {
+        PluginUtil.copyNativeLib(apk, mHostContext, mPackageInfo, mNativeLibDir);
+    }
+
+    public PluginContext createPluginContext(Context context) {
+        if (context == null) {
+            return new PluginContext(this);
+        }
+        return new PluginContext(this, context);
+    }
+
+    // 执行插件Application#onCreate
+    private void invokeApplication() throws Exception {
+        final Exception[] temp = new Exception[1];
+        // make sure application's callback is run on ui thread.
+        RunUtils.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (mApplication != null) {
+                    return;
+                }
+                try {
+                    mApplication = makeApplication(false, mPluginManager.getInstrumentation());
+                } catch (Exception e) {
+                    temp[0] = e;
+                }
+            }
+        }, true);
+
+        if (temp[0] != null) {
+            throw temp[0];
+        }
+    }
+
+    private Application makeApplication(boolean forceDefaultAppClass, Instrumentation instrumentation) throws Exception {
+        if (null != this.mApplication) {
+            return this.mApplication;
+        }
+
+        String appClass = this.mPackageInfo.applicationInfo.className;
+        if (forceDefaultAppClass || null == appClass) {
+            appClass = "android.app.Application";
+        }
+        // 创建插件的Application
+        this.mApplication = instrumentation.newApplication(this.mClassLoader, appClass, this.getPluginContext());
+        // inject activityLifecycleCallbacks of the host application
+        mApplication.registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacksProxy());
+        instrumentation.callApplicationOnCreate(this.mApplication);
+        return this.mApplication;
+    }
+
+
+    /**
+     * 封装ActivityInfo
+     *
+     * @param packageInfo
+     * @return
+     */
+    private Map<ComponentName, ActivityInfo> getActivityInfo(PackageInfo packageInfo) {
+        Map<ComponentName, ActivityInfo> map = new HashMap<>();
+        for (ActivityInfo activity : packageInfo.activities) {
+            map.put(new ComponentName(packageInfo.packageName, activity.name), activity);
+        }
+        return map;
+    }
+
+
+    /**
+     * 返回插件包路径
+     *
+     * @return
+     */
+    public String getLocation() {
+        return this.mLocation;
+    }
+
+    /**
+     * 插件包名
+     *
+     * @return
+     */
+    public String getPackageName() {
+        return this.mPackageInfo.packageName;
+    }
+
+    /**
+     * 返回插件AssetManager
+     *
+     * @return
+     */
+    public AssetManager getAssets() {
+        return getResources().getAssets();
+    }
+
+    /**
+     * 返回插件Resources
+     *
+     * @return
+     */
+    public Resources getResources() {
+        return this.mResources;
+    }
+
+    /**
+     * 返回插件Theme
+     *
+     * @return
+     */
+    public Resources.Theme getTheme() {
+        Resources.Theme theme = this.mResources.newTheme();
+        theme.applyStyle(PluginUtil.selectDefaultTheme(this.mPackageInfo.applicationInfo.theme, Build.VERSION.SDK_INT), false);
+        return theme;
+    }
+
+    /**
+     * 更新Resource
+     *
+     * @param newResources
+     */
+    public void updateResources(Resources newResources) {
+        this.mResources = newResources;
+    }
+
+    /**
+     * 插件ClassLoader
+     *
+     * @return
+     */
+    public ClassLoader getClassLoader() {
+        return this.mClassLoader;
+    }
+
+    /**
+     * 插件管理类
+     *
+     * @return
+     */
+    public PluginManager getPluginManager() {
+        return this.mPluginManager;
+    }
+
+    /**
+     * 宿主Context
+     *
+     * @return
+     */
+    public Context getHostContext() {
+        return this.mHostContext;
+    }
+
+    /**
+     * 插件Context
+     *
+     * @return
+     */
+    public Context getPluginContext() {
+        return this.mPluginContext;
+    }
+
+    /**
+     * 插件的Application
+     *
+     * @return
+     */
+    public Application getApplication() {
+        return mApplication;
+    }
+
+
+    /**
+     * 获取启动Intent
+     *
+     * @return
+     */
+    public Intent getLaunchIntent() {
+        ContentResolver resolver = this.mPluginContext.getContentResolver();
+        Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+
+        ArrayList/*ArrayList<Activity>*/ activities = ReflectUtils.getField(this.mPackage, "activities");
+        for (Object/*PackageParser.Activity*/ activity : activities) {
+            ArrayList/*ArrayList<ActivityIntentInfo>*/ intents = ReflectUtils.getField(activity, "intents");
+            for (Object/*PackageParser.ActivityIntentInfo*/ intentInfo : intents) {
+                try {
+                    boolean match = (int) ReflectUtils.invokeMethod(intentInfo, "match", new Class[]{
+                            resolver.getClass(),
+                            launcher.getClass(),
+                            boolean.class,
+                            String.class
+                    }, resolver, launcher, false, TAG) > 0;
+                    if (match) {
+                        return Intent.makeMainActivity((ComponentName) ReflectUtils.invokeMethod(activity, "getComponentName"));
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return null;
+    }
+
+    //=====================根据intent返回ResolveInfo==============================================
+    public ResolveInfo resolveActivity(Intent intent, int flags) {
+        List<ResolveInfo> query = this.queryIntentActivities(intent, flags);
+        if (null == query || query.isEmpty()) {
+            return null;
+        }
+
+        ContentResolver resolver = this.mPluginContext.getContentResolver();
+        return chooseBestActivity(intent, intent.resolveTypeIfNeeded(resolver), flags, query);
+    }
+
+    private ResolveInfo chooseBestActivity(Intent intent, String s, int flags, List<ResolveInfo> query) {
+        return query.get(0);
+    }
+
+
+    public List<ResolveInfo> queryIntentActivities(Intent intent, int flags) {
+        ComponentName component = intent.getComponent();
+        List<ResolveInfo> resolveInfos = new ArrayList<ResolveInfo>();
+        ContentResolver resolver = this.mPluginContext.getContentResolver();
+
+        if (null != component) {
+            for (Map.Entry<ComponentName, ActivityInfo> entry : mActivityInfos.entrySet()) {
+                ComponentName source = entry.getKey();
+                if (match(source, component)) {
+                    ResolveInfo resolveInfo = new ResolveInfo();
+                    resolveInfo.activityInfo = entry.getValue();
+                    resolveInfos.add(resolveInfo);
+                }
+            }
+        } else {
+            try {
+                ArrayList/*ArrayList<Activity>*/ activities = ReflectUtils.getField(this.mPackage, "activities");
+                for (Object/*PackageParser.Activity*/ activity : activities) {
+                    ArrayList/*ArrayList<ActivityIntentInfo>*/ intents = ReflectUtils.getField(activity, "intents");
+                    for (Object/*PackageParser.ActivityIntentInfo*/ intentInfo : intents) {
+                        boolean match = (int) ReflectUtils.invokeMethod(intentInfo, "match", new Class[]{
+                                resolver.getClass(),
+                                intent.getClass(),
+                                boolean.class,
+                                String.class
+                        }, resolver, intent, true, TAG) >= 0;
+                        if (match) {
+                            ResolveInfo resolveInfo = new ResolveInfo();
+                            resolveInfo.activityInfo = ReflectUtils.getField(activity, "info");
+                            resolveInfos.add(resolveInfo);
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return resolveInfos;
+    }
+
+    /**
+     * 返回对应的 ActivityInfo
+     *
+     * @param componentName
+     * @return
+     */
+    public ActivityInfo getActivityInfo(ComponentName componentName) {
+        return this.mActivityInfos.get(componentName);
+    }
+
+    /**
+     * 匹配ComponentName
+     *
+     * @param source
+     * @param target
+     * @return
+     */
+    public boolean match(ComponentName source, ComponentName target) {
+        if (source == target) return true;
+        if (source != null && target != null
+                && source.getClassName().equals(target.getClassName())
+                && (source.getPackageName().equals(target.getPackageName())
+                || mHostContext.getPackageName().equals(target.getPackageName()))) {
+            return true;
+        }
+        return false;
+    }
+    //=====================根据intent返回ResolveInfo==============================================
+}
