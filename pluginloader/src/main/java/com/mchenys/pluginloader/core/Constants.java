@@ -22,7 +22,7 @@ public class Constants {
     public static final boolean COMBINE_CLASSLOADER = true;
     public static final boolean DEBUG = true;
 
-    public static final String TAG = "PLoader";
+    public static final String TAG = "PL";
     public static final String TAG_PREFIX = TAG + ".";
     public static final int RESULT_SUCCESS = 0;
 }

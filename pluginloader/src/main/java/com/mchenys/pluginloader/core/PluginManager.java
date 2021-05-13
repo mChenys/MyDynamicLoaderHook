@@ -6,6 +6,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
+import android.os.Bundle;
 import android.os.Looper;
 import android.util.Log;
 
@@ -93,7 +94,11 @@ public class PluginManager {
         try {
             Object activityThread = ReflectUtils.getActivityThread();
             Instrumentation base = ReflectUtils.getField(activityThread, "mInstrumentation");
-            ReflectUtils.setField(activityThread, "mInstrumentation", new PLInstrumentation(this, base));
+            mInstrumentation = new PLInstrumentation(this, base);
+            mInstrumentation.onCreate(new Bundle());
+            ReflectUtils.invokeMethod(Class.forName("android.app.Instrumentation"), mInstrumentation, "basicInit"
+                    , new Class[]{Class.forName("android.app.ActivityThread")}, activityThread);
+            ReflectUtils.setField(activityThread, "mInstrumentation", mInstrumentation);
             Log.e(TAG, "==================hookInstrumentation success!!! ");
         } catch (Exception e) {
             e.printStackTrace();

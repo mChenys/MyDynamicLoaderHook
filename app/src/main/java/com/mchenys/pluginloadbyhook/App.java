@@ -13,8 +13,8 @@ import com.mchenys.pluginloader.core.PluginManager;
 public class App extends Application {
 
     @Override
-    public void onCreate() {
-        super.onCreate();
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(base);
         PluginManager.getInstance().init(this);
     }
 }

@@ -94,11 +94,13 @@ public class LoadedPlugin {
      * @throws Exception
      */
     private static PackageInfo getPackageInfo(Context context, File apk) throws Exception {
-        return context.getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(),
+       /* return context.getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(),
                 PackageManager.GET_ACTIVITIES |
                         PackageManager.GET_RECEIVERS |
                         PackageManager.GET_PROVIDERS |
-                        PackageManager.GET_SERVICES);
+                        PackageManager.GET_SERVICES);*/
+        return context.getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(),
+                PackageManager.GET_ACTIVITIES | PackageManager.GET_SERVICES);
     }
 
 
@@ -341,27 +343,31 @@ public class LoadedPlugin {
      * @return
      */
     public Intent getLaunchIntent() {
-        ContentResolver resolver = this.mPluginContext.getContentResolver();
-        Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        try {
+            ContentResolver resolver = this.mPluginContext.getContentResolver();
+            Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+            ArrayList/*ArrayList<Activity>*/ activities = ReflectUtils.getField(this.mPackage, "activities");
+            for (Object/*PackageParser.Activity*/ activity : activities) {
+                ArrayList/*ArrayList<ActivityIntentInfo>*/ intents = ReflectUtils.getField(Class.forName("android.content.pm.PackageParser$Component"), activity, "intents");
+                if (null != intents) {
+                    for (Object/*PackageParser.ActivityIntentInfo*/ intentInfo : intents) {
 
-        ArrayList/*ArrayList<Activity>*/ activities = ReflectUtils.getField(this.mPackage, "activities");
-        for (Object/*PackageParser.Activity*/ activity : activities) {
-            ArrayList/*ArrayList<ActivityIntentInfo>*/ intents = ReflectUtils.getField(activity, "intents");
-            for (Object/*PackageParser.ActivityIntentInfo*/ intentInfo : intents) {
-                try {
-                    boolean match = (int) ReflectUtils.invokeMethod(intentInfo, "match", new Class[]{
-                            resolver.getClass(),
-                            launcher.getClass(),
-                            boolean.class,
-                            String.class
-                    }, resolver, launcher, false, TAG) > 0;
-                    if (match) {
-                        return Intent.makeMainActivity((ComponentName) ReflectUtils.invokeMethod(activity, "getComponentName"));
+                        boolean match = (int) ReflectUtils.invokeMethod(Class.forName("android.content.IntentFilter"), intentInfo, "match", new Class[]{
+                                Class.forName("android.content.ContentResolver"),
+                                Class.forName("android.content.Intent"),
+                                boolean.class,
+                                String.class
+                        }, resolver, launcher, false, TAG) > 0;
+                        if (match) {
+                            return Intent.makeMainActivity((ComponentName) ReflectUtils.invokeMethod(Class.forName("android.content.pm.PackageParser$Component"), activity, "getComponentName", null));
+                        }
+
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
                 }
+
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return null;
     }
@@ -400,17 +406,17 @@ public class LoadedPlugin {
             try {
                 ArrayList/*ArrayList<Activity>*/ activities = ReflectUtils.getField(this.mPackage, "activities");
                 for (Object/*PackageParser.Activity*/ activity : activities) {
-                    ArrayList/*ArrayList<ActivityIntentInfo>*/ intents = ReflectUtils.getField(activity, "intents");
+                    ArrayList/*ArrayList<ActivityIntentInfo>*/ intents = ReflectUtils.getField(Class.forName("android.content.pm.PackageParser$Component"), activity, "intents");
                     for (Object/*PackageParser.ActivityIntentInfo*/ intentInfo : intents) {
-                        boolean match = (int) ReflectUtils.invokeMethod(intentInfo, "match", new Class[]{
-                                resolver.getClass(),
-                                intent.getClass(),
+                        boolean match = (int) ReflectUtils.invokeMethod(Class.forName("android.content.IntentFilter"), intentInfo, "match", new Class[]{
+                                Class.forName("android.content.ContentResolver"),
+                                Class.forName("android.content.Intent"),
                                 boolean.class,
                                 String.class
                         }, resolver, intent, true, TAG) >= 0;
                         if (match) {
                             ResolveInfo resolveInfo = new ResolveInfo();
-                            resolveInfo.activityInfo = ReflectUtils.getField(activity, "info");
+                            resolveInfo.activityInfo = ReflectUtils.getField(Class.forName("android.content.pm.PackageParser$Activity"), activity, "info");
                             resolveInfos.add(resolveInfo);
                             break;
                         }

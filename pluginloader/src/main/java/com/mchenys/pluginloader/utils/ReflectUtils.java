@@ -28,14 +28,14 @@ public class ReflectUtils {
     }
 
     /**
-     * 获取ClassLoader中的DexPathList
+     * 获取BaseDexClassLoader中的DexPathList
      *
      * @param classLoader
      * @return DexPathList
      * @throws Exception
      */
     public static Object getPathList(ClassLoader classLoader) throws Exception {
-        Field pathList = classLoader.getClass().getDeclaredField("pathList");
+        Field pathList = Class.forName("dalvik.system.BaseDexClassLoader").getDeclaredField("pathList");
         pathList.setAccessible(true);
         return pathList.get(classLoader);
     }
@@ -169,6 +169,14 @@ public class ReflectUtils {
         return method.invoke(null, args);
     }
 
+    public static <T> T getStaticField(String className, String fieldName) {
+        try {
+            return getStaticField(Class.forName(className), fieldName);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     /**
      * 获取静态属性
@@ -182,7 +190,7 @@ public class ReflectUtils {
         try {
             Field declaredField = tClass.getDeclaredField(fieldName);
             declaredField.setAccessible(true);
-            return (T)declaredField.get(null);
+            return (T) declaredField.get(null);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -199,6 +207,15 @@ public class ReflectUtils {
      */
     public static <T> T getField(Object instance, String fieldName) {
         return getField(instance.getClass(), instance, fieldName);
+    }
+
+    public static <T> T getField(String className, Object instance, String fieldName) {
+        try {
+            return getField(Class.forName(className), instance, fieldName);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     public static <T> T getField(Class<?> clazz, Object instance, String fieldName) {
