@@ -16,10 +16,12 @@ import com.mchenys.pluginloader.core.PluginManager;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.channels.FileChannel;
 import java.util.Enumeration;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -138,7 +140,6 @@ public class PluginUtil {
     public static void copyNativeLib(File apk, Context context, PackageInfo packageInfo, File nativeLibDir) throws Exception {
         long startTime = System.currentTimeMillis();
         ZipFile zipfile = new ZipFile(apk.getAbsolutePath());
-
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 for (String cpuArch : Build.SUPPORTED_ABIS) {
@@ -151,9 +152,7 @@ public class PluginUtil {
                     return;
                 }
             }
-
             findAndCopyNativeLib(zipfile, context, "armeabi", packageInfo, nativeLibDir);
-
         } finally {
             zipfile.close();
             Log.d(TAG, "Done! +" + (System.currentTimeMillis() - startTime) + "ms");
@@ -251,5 +250,38 @@ public class PluginUtil {
         return index != -1 ? (Intent) args[index] : null;
     }
 
-
+    /**
+     * 文件拷贝
+     *
+     * @param src
+     * @param dest
+     * @param deleteAfter 操作成功后是否需要删除源文件,true 删除
+     * @throws Exception
+     */
+    public static void copy(File src, File dest, boolean deleteAfter) throws Exception {
+        FileChannel inChannel = null;
+        FileChannel outChannel = null;
+        try {
+            if (dest.exists()) {
+                dest.delete();
+            }
+            dest.createNewFile();
+            inChannel = new FileInputStream(src).getChannel();
+            outChannel = new FileOutputStream(dest).getChannel();
+            inChannel.transferTo(0, inChannel.size(), outChannel);
+        } catch (IOException e) {
+            throw e;
+        } finally {
+            if (inChannel != null) {
+                inChannel.close();
+            }
+            if (outChannel != null) {
+                outChannel.close();
+            }
+            if (dest.exists() && deleteAfter) {
+                //删除源文件
+                src.delete();
+            }
+        }
+    }
 }

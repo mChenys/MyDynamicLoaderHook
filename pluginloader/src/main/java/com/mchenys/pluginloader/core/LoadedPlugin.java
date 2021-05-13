@@ -35,25 +35,25 @@ import dalvik.system.DexClassLoader;
 public class LoadedPlugin {
     public static final String TAG = Constants.TAG_PREFIX + "LoadedPlugin";
 
-    private final String mLocation;
-    private PluginManager mPluginManager;
-    private Context mHostContext;
-    private Context mPluginContext;
-    private final File mNativeLibDir;
-    private final Object mPackage; // PackageParser.Package
-    private final PackageInfo mPackageInfo;
-    private Resources mResources;
-    private ClassLoader mClassLoader;
-    private Application mApplication; // 插件的Application
-    private Intent mLaunchIntent;
-    private Map<ComponentName, ActivityInfo> mActivityInfos; // 插件包的ActivityInfo
+    public final String mLocation;
+    public PluginManager mPluginManager;
+    public Context mHostContext;
+    public Context mPluginContext;
+    public final File mNativeLibDir;
+    public final Object mPackage; // PackageParser.Package
+    public final PackageInfo mPackageInfo;
+    public Resources mResources;
+    public ClassLoader mClassLoader;
+    public Application mApplication; // 插件的Application
+    public Intent mLaunchIntent;
+    public Map<ComponentName, ActivityInfo> mActivityInfos; // 插件包的ActivityInfo
 
-    public LoadedPlugin(PluginManager pluginManager, Context context, File apk) throws Exception {
+    private LoadedPlugin(PluginManager pluginManager, Context context, PackageInfo packageInfo, File apk) throws Exception {
         this.mPluginManager = pluginManager;
         this.mHostContext = context;
         this.mLocation = apk.getAbsolutePath();
         this.mPackage = PackageParserCompat.parsePackage(context, apk, PackageParserCompat.PARSE_MUST_BE_APK);
-        this.mPackageInfo = getPackageInfo(context, apk);
+        this.mPackageInfo = packageInfo;
         this.mPluginContext = createPluginContext(null);
         this.mNativeLibDir = getDir(context, Constants.NATIVE_DIR);
         this.mResources = createResources(context, apk);
@@ -64,6 +64,26 @@ public class LoadedPlugin {
         invokeApplication();
     }
 
+    /**
+     * 创建插件包
+     *
+     * @param pluginManager
+     * @param context
+     * @param apk
+     * @param forceLoad     强制加载
+     * @return
+     */
+    public static LoadedPlugin create(PluginManager pluginManager, Context context, File apk, boolean forceLoad) throws Exception {
+        PackageInfo packageInfo = getPackageInfo(context, apk);
+        String packageName = packageInfo.packageName;
+        Map<String, LoadedPlugin> pluginMap = pluginManager.getLoadedPlugins();
+        LoadedPlugin loadedPlugin = pluginMap.get(packageName);
+        if (loadedPlugin == null || forceLoad) {
+            loadedPlugin = new LoadedPlugin(pluginManager, context, packageInfo, apk);
+            pluginMap.put(packageName, loadedPlugin);
+        }
+        return loadedPlugin;
+    }
 
     /**
      * 获取插件包的PackageInfo
@@ -73,9 +93,12 @@ public class LoadedPlugin {
      * @return
      * @throws Exception
      */
-    private PackageInfo getPackageInfo(Context context, File apk) throws Exception {
-        return context.getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(), PackageManager.GET_ACTIVITIES |
-                PackageManager.GET_SERVICES);
+    private static PackageInfo getPackageInfo(Context context, File apk) throws Exception {
+        return context.getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(),
+                PackageManager.GET_ACTIVITIES |
+                        PackageManager.GET_RECEIVERS |
+                        PackageManager.GET_PROVIDERS |
+                        PackageManager.GET_SERVICES);
     }
 
 

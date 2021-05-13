@@ -6,7 +6,10 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
+import android.os.Looper;
 import android.util.Log;
+
+import androidx.annotation.WorkerThread;
 
 import com.mchenys.pluginloader.core.hook.Android10_11Hook;
 import com.mchenys.pluginloader.core.hook.Android5_7Hook;
@@ -15,13 +18,15 @@ import com.mchenys.pluginloader.core.hook.IAndroidHook;
 import com.mchenys.pluginloader.core.hook.PLInstrumentation;
 import com.mchenys.pluginloader.utils.PluginUtil;
 import com.mchenys.pluginloader.utils.ReflectUtils;
-import com.mchenys.pluginloader.utils.ReflectionLimit;
 import com.mchenys.pluginloader.utils.VersionUtils;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * @Author: mChenys
@@ -38,7 +43,9 @@ public class PluginManager {
     private Application mApplication;
     private ComponentsHandler mComponentsHandler;
     private PLInstrumentation mInstrumentation;
-
+    private ExecutorService mThreadPool = Executors.newCachedThreadPool();
+    // 插件apk目录
+    private File mPluginApkDir;
 
     private PluginManager() {
     }
@@ -47,18 +54,21 @@ public class PluginManager {
         return sInstance;
     }
 
+    public Map<String, LoadedPlugin> getLoadedPlugins() {
+        return mPlugins;
+    }
+
     /**
      * 初始化操作
      *
      * @param context
      */
     public void init(Context context) {
-        ReflectionLimit.clearLimit();
         if (context instanceof Application) {
             this.mApplication = (Application) context;
             this.mContext = mApplication.getBaseContext();
         } else {
-            final Context app = context.getApplicationContext();
+            Context app = context.getApplicationContext();
             if (app == null) {
                 this.mContext = context;
                 this.mApplication = (Application) mContext;
@@ -67,9 +77,10 @@ public class PluginManager {
                 this.mContext = mApplication.getBaseContext();
             }
         }
-
         this.mComponentsHandler = createComponentsHandler();
+        this.mPluginApkDir = mContext.getDir(Constants.PLUGIN_DIR, Context.MODE_PRIVATE);
         hookCurrentProcess();
+        loadInnerPlugin();
     }
 
     private void hookCurrentProcess() {
@@ -117,6 +128,94 @@ public class PluginManager {
 
     }
 
+    /**
+     * 加载已存在的插件,保证每次启动的时候可用
+     */
+    @WorkerThread
+    private void loadInnerPlugin() {
+        if (null != mPluginApkDir.listFiles())
+            for (File file : mPluginApkDir.listFiles()) {
+                try {
+                    loadPlugin(file, false, null);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+    }
+
+    /**
+     * 加载外部插件
+     *
+     * @param file
+     * @param callback
+     */
+    public void addPlugin(File file, PluginLoadCallback callback) {
+        try {
+            // 先copy到私有目录
+            File dest = new File(mPluginApkDir, file.getName());
+            PluginUtil.copy(file, dest, true);
+            if (dest.exists() && dest.length() > 0) {
+                loadPlugin(dest, true, callback);
+            }
+        } catch (Exception e) {
+            if (null != callback) callback.onError(e.getMessage());
+        }
+    }
+
+    /**
+     * 注意:同步操作,需要在子线程中调用
+     *
+     * @param file
+     * @return LoadedPlugin
+     */
+    public LoadedPlugin addPlugin(File file) {
+        try {
+            // 先copy到私有目录
+            File dest = new File(mPluginApkDir, file.getName());
+            PluginUtil.copy(file, dest, true);
+            if (dest.exists() && dest.length() > 0) {
+                return LoadedPlugin.create(PluginManager.this, mContext, file, true);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * 加载插件
+     *
+     * @param file      插件包
+     * @param forceLoad 是否强制加载
+     * @param callback  加载回调
+     */
+    @WorkerThread
+    private void loadPlugin(File file, boolean forceLoad, PluginLoadCallback callback) {
+        workOnThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    LoadedPlugin loadedPlugin = LoadedPlugin.create(PluginManager.this, mContext, file, forceLoad);
+                    if (null != callback) {
+                        callback.onComplete(loadedPlugin);
+                    }
+                } catch (Exception e) {
+                    if (null != callback) callback.onError(e.getMessage());
+                }
+            }
+        });
+    }
+
+    /**
+     * 在子线程中执行
+     *
+     * @param runnable
+     */
+    private void workOnThread(Runnable runnable) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            mThreadPool.submit(runnable);
+        } else runnable.run();
+    }
 
     private ComponentsHandler createComponentsHandler() {
         return new ComponentsHandler(this);
@@ -181,5 +280,9 @@ public class PluginManager {
             }
         }
         return null;
+    }
+
+    public int uninstallPlugin(String packageName) {
+        return 0;
     }
 }
