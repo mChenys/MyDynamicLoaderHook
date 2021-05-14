@@ -64,7 +64,7 @@ public class StubActivityInfo {
         boolean windowIsTranslucent = array.getBoolean(0, false);
         array.recycle();
         if (Constants.DEBUG) {
-            Log.d(Constants.TAG_PREFIX + "StubActivityInfo", "getStubActivity, is transparent theme ? " + windowIsTranslucent);
+            Log.e(Constants.TAG_PREFIX + "StubActivityInfo", "getStubActivity, is transparent theme ? " + windowIsTranslucent);
         }
         // 格式化占坑Activity全路径类名,默认是标准启动模式
         stubActivity = String.format(STUB_ACTIVITY_STANDARD, corePackage, usedStandardStubActivity);

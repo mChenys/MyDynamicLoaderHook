@@ -1,5 +1,6 @@
 package com.mchenys.pluginloader.core;
 
+import android.app.Activity;
 import android.app.Service;
 import android.content.ComponentName;
 import android.content.Context;
@@ -71,6 +72,7 @@ public class ComponentsHandler {
             intent.putExtra(Constants.KEY_IS_PLUGIN, true);
             intent.putExtra(Constants.KEY_TARGET_PACKAGE, targetPackageName);
             intent.putExtra(Constants.KEY_TARGET_CLASS, targetClassName);
+            // 选择合适的占坑Activity
             dispatchStubActivity(intent);
         }
     }
@@ -93,7 +95,8 @@ public class ComponentsHandler {
         themeObj.applyStyle(info.theme, true);
         // 获取占坑Activity的类名
         String stubActivity = mStubActivityInfo.getStubActivity(targetClassName, launchMode, themeObj);
-        Log.i(TAG, String.format("dispatchStubActivity,[%s -> %s]", targetClassName, stubActivity));
+        Log.e(TAG, String.format("dispatchStubActivity,[%s -> %s]", targetClassName, stubActivity));
+        // 设置启动的占坑Activity
         intent.setClassName(mHostContext, stubActivity);
     }
 

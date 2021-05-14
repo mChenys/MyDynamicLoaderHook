@@ -19,6 +19,7 @@ import com.mchenys.pluginloader.core.hook.IAndroidHook;
 import com.mchenys.pluginloader.core.hook.PLInstrumentation;
 import com.mchenys.pluginloader.utils.PluginUtil;
 import com.mchenys.pluginloader.utils.ReflectUtils;
+import com.mchenys.pluginloader.utils.RunUtils;
 import com.mchenys.pluginloader.utils.VersionUtils;
 
 import java.io.File;
@@ -179,7 +180,7 @@ public class PluginManager {
             File dest = new File(mPluginApkDir, file.getName());
             PluginUtil.copy(file, dest, true);
             if (dest.exists() && dest.length() > 0) {
-                return LoadedPlugin.create(PluginManager.this, mContext, file, true);
+                return LoadedPlugin.create(PluginManager.this, mContext, dest, true);
             }
         } catch (Exception e) {
             e.printStackTrace();

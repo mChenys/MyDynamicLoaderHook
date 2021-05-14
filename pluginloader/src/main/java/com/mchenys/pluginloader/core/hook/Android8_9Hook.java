@@ -53,6 +53,7 @@ public class Android8_9Hook extends Android5_7Hook {
                 if (ClientTransactionClass.isInstance(obj)) {
                     List mActivityCallbacks = ReflectUtils.getField(obj, "mActivityCallbacks");
                     for (int i = 0; i < mActivityCallbacks.size(); i++) {
+                        // android.app.servertransaction.LaunchActivityItem
                         Object launchActivityItem = mActivityCallbacks.get(i);
                         if (LaunchActivityItemClass.isInstance(launchActivityItem)) {
                            /* Intent mIntent = ReflectUtils.getField(launchActivityItem, "mIntent");
@@ -62,13 +63,13 @@ public class Android8_9Hook extends Android5_7Hook {
                             ReflectUtils.setField(launchActivityItem, "mIntent", pluginIntent);*/
 
                             // 处理intent交给PLInstrumentation处理,这里只设置主题
-                            Intent intent = ReflectUtils.getField(launchActivityItem, "mIntent");
+                            Intent intent = ReflectUtils.getField(LaunchActivityItemClass, launchActivityItem, "mIntent");
                             if (PluginUtil.isIntentFromPlugin(intent)) {
-                                ActivityInfo activityInfo = ReflectUtils.getField(launchActivityItem, "activityInfo");
+                                ActivityInfo activityInfo = ReflectUtils.getField(LaunchActivityItemClass, launchActivityItem, "mInfo");
                                 int theme = PluginUtil.getTheme(intent);
                                 if (theme != 0) {
-                                    Log.d(TAG, "resolve theme, current theme:" + activityInfo.theme + "  after :0x" + Integer.toHexString(theme));
-                                    activityInfo.theme = theme;
+                                    Log.e(TAG, "resolve theme, current theme:" + activityInfo.theme + "  after :0x" + Integer.toHexString(theme));
+                                    activityInfo.theme = theme;// 给占坑Activity设置主题
                                 }
                             }
                             break;

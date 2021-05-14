@@ -1,5 +1,6 @@
 package com.mchenys.pluginloader.utils;
 
+import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -65,10 +66,20 @@ public class PluginUtil {
         return intent.getBooleanExtra(Constants.KEY_IS_PLUGIN, false);
     }
 
+    /**
+     * 获取插件包的主题
+     * @param intent
+     * @return
+     */
     public static int getTheme(Intent intent) {
         return getTheme(PluginUtil.getComponent(intent));
     }
 
+    /**
+     *  获取插件包的主题
+     * @param component
+     * @return
+     */
     public static int getTheme(ComponentName component) {
         LoadedPlugin loadedPlugin = PluginManager.getInstance().getLoadedPlugin(component);
 
@@ -80,16 +91,17 @@ public class PluginUtil {
         if (null == info) {
             return 0;
         }
-
-        if (0 != info.theme) {
+        // 优先判断Activity的theme
+         if (0 != info.theme) {
             return info.theme;
         }
-
+        // 然后判断Application的theme
         ApplicationInfo appInfo = info.applicationInfo;
         if (null != appInfo && appInfo.theme != 0) {
             return appInfo.theme;
         }
 
+        // 否则返回默认主题
         return selectDefaultTheme(0, Build.VERSION.SDK_INT);
     }
 
@@ -108,6 +120,16 @@ public class PluginUtil {
                 android.R.style.Theme_DeviceDefault_Light_DarkActionBar);
     }
 
+    /**
+     * 根据版本选中对应的默认主题
+     * @param curTheme
+     * @param targetSdkVersion
+     * @param orig
+     * @param holo
+     * @param dark
+     * @param deviceDefault
+     * @return
+     */
     public static int selectSystemTheme(final int curTheme, final int targetSdkVersion, final int orig, final int holo, final int dark, final int deviceDefault) {
         if (curTheme != 0) {
             return curTheme;

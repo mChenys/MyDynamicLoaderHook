@@ -50,14 +50,14 @@ public class PLInstrumentation extends Instrumentation {
             Log.i(TAG, String.format("newActivity[%s]", className));
 
         } catch (ClassNotFoundException e) {
-            ComponentName component = PluginUtil.getComponent(intent);
+            ComponentName component = PluginUtil.getComponent(intent); // 的到插件的ComponentName
 
             if (component == null) {
                 return newActivity(mBase.newActivity(cl, className, intent));
             }
 
             String targetClassName = component.getClassName();
-            Log.d(TAG, String.format("newActivity[%s : %s/%s]", className, component.getPackageName(), targetClassName));
+            Log.e(TAG, String.format("newActivity[%s : %s/%s]", className, component.getPackageName(), targetClassName));
 
             LoadedPlugin plugin = this.mPluginManager.getLoadedPlugin(component);
 
@@ -79,8 +79,8 @@ public class PLInstrumentation extends Instrumentation {
                 return newActivity(mBase.newActivity(cl, StubActivity.class.getName(), intent));
             }
 
-            Activity activity = mBase.newActivity(plugin.getClassLoader(), targetClassName, intent);
-            activity.setIntent(intent);
+            Activity activity = mBase.newActivity(plugin.getClassLoader(), targetClassName, intent); // 创建插件的activity
+            activity.setIntent(intent);// 保存intent，callActivityOnCreate会取出来，注意此intent是宿主的占坑activity，
 
             // for 4.1+
             try {
@@ -120,20 +120,22 @@ public class PLInstrumentation extends Instrumentation {
                 // 修改ContextWrapper的mBase
                 ReflectUtils.setField(Class.forName("android.content.ContextWrapper"), activity, "mBase", plugin.createPluginContext(activity.getBaseContext()));
                 // 修改插件Activity的mApplication
-                ReflectUtils.setField(activity, "mBase", plugin.getApplication());
+                ReflectUtils.setField(Class.forName("android.app.Activity"), activity, "mApplication", plugin.getApplication());
+
+                // 获取插件的ComponentName
+                ComponentName component = PluginUtil.getComponent(intent);
 
                 // set screenOrientation
-                ActivityInfo activityInfo = plugin.getActivityInfo(PluginUtil.getComponent(intent));
+                ActivityInfo activityInfo = plugin.getActivityInfo(component);
                 if (activityInfo.screenOrientation != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
                     activity.setRequestedOrientation(activityInfo.screenOrientation);
                 }
 
-                // for native activity
-                ComponentName component = PluginUtil.getComponent(intent);
+                // 还原插件的intent
                 Intent wrapperIntent = new Intent(intent);
                 wrapperIntent.setClassName(component.getPackageName(), component.getClassName());
                 wrapperIntent.setExtrasClassLoader(activity.getClassLoader());
-                activity.setIntent(wrapperIntent);
+                activity.setIntent(wrapperIntent); // 更新插件Activity的intent
 
             } catch (Exception e) {
                 Log.w(TAG, e);
