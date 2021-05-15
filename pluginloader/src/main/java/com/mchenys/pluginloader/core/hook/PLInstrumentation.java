@@ -46,9 +46,9 @@ public class PLInstrumentation extends Instrumentation {
     @Override
     public Activity newActivity(ClassLoader cl, String className, Intent intent) throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         try {
+            // 假设className是占坑的Activity，由于只是存在清单文件，并没有对应的class文件，所以会报ClassNotFoundException，然后在catch中处理插件activity的加载
             cl.loadClass(className);
             Log.i(TAG, String.format("newActivity[%s]", className));
-
         } catch (ClassNotFoundException e) {
             ComponentName component = PluginUtil.getComponent(intent); // 的到插件的ComponentName
 
