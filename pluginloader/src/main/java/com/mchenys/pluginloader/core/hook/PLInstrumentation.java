@@ -48,7 +48,7 @@ public class PLInstrumentation extends Instrumentation {
         try {
             // 假设className是占坑的Activity，由于只是存在清单文件，并没有对应的class文件，所以会报ClassNotFoundException，然后在catch中处理插件activity的加载
             cl.loadClass(className);
-            Log.i(TAG, String.format("newActivity[%s]", className));
+            Log.e(TAG, String.format("newActivity[%s]", className));
         } catch (ClassNotFoundException e) {
             ComponentName component = PluginUtil.getComponent(intent); // 的到插件的ComponentName
 
@@ -75,7 +75,7 @@ public class PLInstrumentation extends Instrumentation {
                     throw new ActivityNotFoundException("error intent: " + intent.toURI());
                 }
 
-                Log.i(TAG, "Not found. starting the stub activity: " + StubActivity.class);
+                Log.e(TAG, "Not found. starting the stub activity: " + StubActivity.class);
                 return newActivity(mBase.newActivity(cl, StubActivity.class.getName(), intent));
             }
 
@@ -110,21 +110,19 @@ public class PLInstrumentation extends Instrumentation {
     }
 
     protected void injectActivity(Activity activity) {
+        // 此Activity是插件的Activity
         final Intent intent = activity.getIntent();
         if (PluginUtil.isIntentFromPlugin(intent)) {
-            Context base = activity.getBaseContext();
             try {
                 LoadedPlugin plugin = this.mPluginManager.getLoadedPlugin(intent);
-                // 修改Context的mResources
-                ReflectUtils.setField(base, "mResources", plugin.getResources());
                 // 修改ContextWrapper的mBase
                 ReflectUtils.setField(Class.forName("android.content.ContextWrapper"), activity, "mBase", plugin.createPluginContext(activity.getBaseContext()));
                 // 修改插件Activity的mApplication
                 ReflectUtils.setField(Class.forName("android.app.Activity"), activity, "mApplication", plugin.getApplication());
-
+                // 修改插件Activity的mResources
+                ReflectUtils.setField(Class.forName("android.view.ContextThemeWrapper"), activity, "mResources", plugin.getResources());
                 // 获取插件的ComponentName
                 ComponentName component = PluginUtil.getComponent(intent);
-
                 // set screenOrientation
                 ActivityInfo activityInfo = plugin.getActivityInfo(component);
                 if (activityInfo.screenOrientation != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {

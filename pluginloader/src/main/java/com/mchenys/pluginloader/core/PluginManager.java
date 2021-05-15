@@ -97,8 +97,6 @@ public class PluginManager {
             Instrumentation base = ReflectUtils.getField(activityThread, "mInstrumentation");
             mInstrumentation = new PLInstrumentation(this, base);
             mInstrumentation.onCreate(new Bundle());
-            ReflectUtils.invokeMethod(Class.forName("android.app.Instrumentation"), mInstrumentation, "basicInit"
-                    , new Class[]{Class.forName("android.app.ActivityThread")}, activityThread);
             ReflectUtils.setField(activityThread, "mInstrumentation", mInstrumentation);
             Log.e(TAG, "==================hookInstrumentation success!!! ");
         } catch (Exception e) {
@@ -111,12 +109,15 @@ public class PluginManager {
             IAndroidHook androidHook = null;
             if (VersionUtils.isAndroid10_11()) {
                 androidHook = new Android10_11Hook(this);
+                Log.e(TAG, "==================hookAms Android10_11");
             }
             if (VersionUtils.isAndroid8_9()) {
                 androidHook = new Android8_9Hook(this);
+                Log.e(TAG, "==================hookAms Android8_9");
             }
             if (VersionUtils.isAndroid5_7()) {
                 androidHook = new Android5_7Hook(this);
+                Log.e(TAG, "==================hookAms Android5_7");
             }
             if (androidHook == null) {
                 throw new RuntimeException("not support system version");

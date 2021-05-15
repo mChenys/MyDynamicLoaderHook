@@ -62,7 +62,7 @@ public class Android8_9Hook extends Android5_7Hook {
                             pluginIntent.setComponent(PluginUtil.getComponent(mIntent));
                             ReflectUtils.setField(launchActivityItem, "mIntent", pluginIntent);*/
 
-                            // 处理intent交给PLInstrumentation处理,这里只设置主题
+                            // 处理intent交给PLInstrumentation处理,这里只设置占坑Activity的主题
                             Intent intent = ReflectUtils.getField(LaunchActivityItemClass, launchActivityItem, "mIntent");
                             if (PluginUtil.isIntentFromPlugin(intent)) {
                                 ActivityInfo activityInfo = ReflectUtils.getField(LaunchActivityItemClass, launchActivityItem, "mInfo");

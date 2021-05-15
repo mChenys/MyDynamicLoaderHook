@@ -16,7 +16,7 @@ import java.lang.reflect.Constructor;
  */
 public class PackageParserCompat {
 
-    public static int PARSE_MUST_BE_APK;
+    public static final int PARSE_MUST_BE_APK = 1 << 0;
     private static Object sPackageParser; // PackageParser instance
     private static Class sPackageClass; // PackageParser$Package
 
@@ -25,7 +25,6 @@ public class PackageParserCompat {
             Class<?> packageParserClass = Class.forName("android.content.pm.PackageParser");
             sPackageParser = packageParserClass.newInstance();
             sPackageClass = Class.forName("android.content.pm.PackageParser$Package");
-            PARSE_MUST_BE_APK = ReflectUtils.getStaticField(packageParserClass, "PARSE_MUST_BE_APK");
         } catch (Exception e) {
             e.printStackTrace();
         }

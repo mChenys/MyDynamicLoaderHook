@@ -13,6 +13,9 @@ import android.content.pm.ResolveInfo;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.os.Build;
+import android.util.Log;
+
+import androidx.viewpager2.widget.MarginPageTransformer;
 
 import com.mchenys.pluginloader.utils.DexUtil;
 import com.mchenys.pluginloader.utils.PluginUtil;
@@ -20,6 +23,7 @@ import com.mchenys.pluginloader.utils.ReflectUtils;
 import com.mchenys.pluginloader.utils.RunUtils;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -62,6 +66,7 @@ public class LoadedPlugin {
         this.mActivityInfos = getActivityInfo(mPackageInfo);
         tryToCopyNativeLib(apk);
         invokeApplication();
+        Log.e(TAG, "mResources:" + mResources.hashCode());
     }
 
     /**
@@ -211,8 +216,22 @@ public class LoadedPlugin {
         if (forceDefaultAppClass || null == appClass) {
             appClass = "android.app.Application";
         }
-        // 创建插件的Application
-        this.mApplication = instrumentation.newApplication(this.mClassLoader, appClass, this.getPluginContext());
+        Object activityThread = null;
+        try {
+            Field mThread = Class.forName("android.app.Instrumentation").getDeclaredField("mThread");
+            mThread.setAccessible(true);
+            activityThread = mThread.get(instrumentation);
+        } catch (Exception e) {
+        }
+        if (activityThread == null) {
+            this.mApplication = (Application) this.mClassLoader.loadClass(appClass).newInstance();
+            //  app.attach(context);
+            ReflectUtils.invokeMethod(Class.forName("android.app.Application"), mApplication,
+                    "attach", new Class[]{Class.forName("android.content.Context")}, this.getPluginContext());
+        } else {
+            // 创建插件的Application
+            this.mApplication = instrumentation.newApplication(this.mClassLoader, appClass, this.getPluginContext());
+        }
         // inject activityLifecycleCallbacks of the host application
         mApplication.registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacksProxy());
         instrumentation.callApplicationOnCreate(this.mApplication);

@@ -13,5 +13,7 @@ public class App  extends Application {
     public void onCreate() {
         super.onCreate();
         Log.e("cys", "plugina application run...");
+        Log.e("App", "mResources:" + (getResources() == null ? "" : getResources().hashCode()));
+        Log.e("App", "mBase:" + (getBaseContext() == null ? "" : getBaseContext().hashCode()));
     }
 }

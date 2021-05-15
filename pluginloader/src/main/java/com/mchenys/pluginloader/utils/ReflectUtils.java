@@ -118,7 +118,7 @@ public class ReflectUtils {
      * @throws Exception
      */
     public static Object invokeMethod(Object instance, String methodName) throws Exception {
-        return invokeMethod(instance, methodName, null, null);
+        return invokeMethod(instance, methodName, null);
     }
 
     /**
@@ -150,7 +150,7 @@ public class ReflectUtils {
      * @throws Exception
      */
     public static Object invokeStaticMethod(Class<?> clazz, String methodName) throws Exception {
-        return invokeStaticMethod(clazz, methodName, null, null);
+        return invokeStaticMethod(clazz, methodName, null);
     }
 
     /**

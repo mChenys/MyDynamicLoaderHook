@@ -5,7 +5,9 @@ plugins {
 android {
     compileSdkVersion 30
     buildToolsVersion "30.0.3"
-
+    aaptOptions {
+        additionalParameters '--allow-reserved-package-id','--package-id','0x71'
+    }
     defaultConfig {
         applicationId "com.mchenys.plugina"
         minSdkVersion 21
