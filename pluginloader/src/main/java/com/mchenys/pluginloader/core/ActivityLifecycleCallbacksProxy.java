@@ -16,7 +16,7 @@ import java.util.ArrayList;
 public class ActivityLifecycleCallbacksProxy implements Application.ActivityLifecycleCallbacks {
 
     final ArrayList<Application.ActivityLifecycleCallbacks> mActivityLifecycleCallbacks =
-            ReflectUtils.getField("android.app.Application", ReflectUtils.getActivityThreadApplication(), "mActivityLifecycleCallbacks");
+            ReflectUtils.getFieldSlience("android.app.Application", ReflectUtils.getActivityThreadApplication(), "mActivityLifecycleCallbacks");
 
     Object[] collectActivityLifecycleCallbacks() {
         if (mActivityLifecycleCallbacks == null) {

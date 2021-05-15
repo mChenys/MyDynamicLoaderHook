@@ -60,15 +60,19 @@ public class Android5_7Hook implements IAndroidHook {
     public boolean handleMessage(@NonNull Message msg) {
         if (Constants.LAUNCH_ACTIVITY == msg.what) {
             // ActivityClientRecord
-            Object activityClientRecord = msg.obj;
-            Intent intent = ReflectUtils.getField(activityClientRecord, "intent");
-            if (PluginUtil.isIntentFromPlugin(intent)) {
-                ActivityInfo activityInfo = ReflectUtils.getField(activityClientRecord, "activityInfo");
-                int theme = PluginUtil.getTheme(intent);
-                if (theme != 0) {
-                    Log.d(TAG, "resolve theme, current theme:" + activityInfo.theme + "  after :0x" + Integer.toHexString(theme));
-                    activityInfo.theme = theme;
+            try {
+                Object activityClientRecord = msg.obj;
+                Intent intent = ReflectUtils.getField(activityClientRecord, "intent");
+                if (PluginUtil.isIntentFromPlugin(intent)) {
+                    ActivityInfo activityInfo = ReflectUtils.getField(activityClientRecord, "activityInfo");
+                    int theme = PluginUtil.getTheme(intent);
+                    if (theme != 0) {
+                        Log.d(TAG, "resolve theme, current theme:" + activityInfo.theme + "  after :0x" + Integer.toHexString(theme));
+                        activityInfo.theme = theme;
+                    }
                 }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
         return false;

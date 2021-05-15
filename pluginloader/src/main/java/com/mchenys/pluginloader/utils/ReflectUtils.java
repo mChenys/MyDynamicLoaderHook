@@ -1,5 +1,6 @@
 package com.mchenys.pluginloader.utils;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
@@ -91,6 +92,24 @@ public class ReflectUtils {
         return nativeLibraryPathElements.get(dexPathList);
     }
 
+    public static <T> T newInstance(Class<?> clazz, Class[] pareTyples, Object[] pareVaules) throws Exception {
+        Constructor ctor = clazz.getDeclaredConstructor(pareTyples);
+        ctor.setAccessible(true);
+        return (T) ctor.newInstance(pareVaules);
+    }
+
+    /**
+     * 创建实例
+     *
+     * @param className
+     * @param pareTyples
+     * @param pareVaules
+     * @return
+     */
+    public static <T> T newInstance(String className, Class[] pareTyples, Object[] pareVaules) throws Exception {
+        return newInstance(Class.forName(className), pareTyples, pareVaules);
+    }
+
     /**
      * 设置属性
      *
@@ -99,11 +118,13 @@ public class ReflectUtils {
      * @param value
      * @throws Exception
      */
-    public static void setField(Object instance, String fieldName, Object value) throws Exception {
+    public static void setField(Object instance, String fieldName, Object value) throws
+            Exception {
         setField(instance.getClass(), instance, fieldName, value);
     }
 
-    public static void setField(Class<?> clazz, Object instance, String fieldName, Object value) throws Exception {
+    public static void setField(Class<?> clazz, Object instance, String fieldName, Object
+            value) throws Exception {
         Field field = clazz.getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(instance, value);
@@ -131,11 +152,13 @@ public class ReflectUtils {
      * @return
      * @throws Exception
      */
-    public static Object invokeMethod(Object instance, String methodName, Class<?>[] argsType, Object... args) throws Exception {
+    public static Object invokeMethod(Object instance, String methodName, Class<?>[]
+            argsType, Object... args) throws Exception {
         return invokeMethod(instance.getClass(), instance, methodName, argsType, args);
     }
 
-    public static Object invokeMethod(Class<?> clazz, Object instance, String methodName, Class<?>[] argsType, Object... args) throws Exception {
+    public static Object invokeMethod(Class<?> clazz, Object instance, String
+            methodName, Class<?>[] argsType, Object... args) throws Exception {
         Method method = clazz.getDeclaredMethod(methodName, argsType);
         method.setAccessible(true);
         return method.invoke(instance, args);
@@ -163,19 +186,15 @@ public class ReflectUtils {
      * @return
      * @throws Exception
      */
-    public static Object invokeStaticMethod(Class<?> clazz, String methodName, Class<?>[] argsType, Object... args) throws Exception {
+    public static Object invokeStaticMethod(Class<?> clazz, String methodName, Class<?>[]
+            argsType, Object... args) throws Exception {
         Method method = clazz.getMethod(methodName, argsType);
         method.setAccessible(true);
         return method.invoke(null, args);
     }
 
-    public static <T> T getStaticField(String className, String fieldName) {
-        try {
-            return getStaticField(Class.forName(className), fieldName);
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-        return null;
+    public static <T> T getStaticField(String className, String fieldName) throws Exception {
+        return getStaticField(Class.forName(className), fieldName);
     }
 
     /**
@@ -186,15 +205,10 @@ public class ReflectUtils {
      * @param <T>
      * @return
      */
-    public static <T> T getStaticField(Class<?> tClass, String fieldName) {
-        try {
-            Field declaredField = tClass.getDeclaredField(fieldName);
-            declaredField.setAccessible(true);
-            return (T) declaredField.get(null);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
+    public static <T> T getStaticField(Class<?> tClass, String fieldName) throws Exception {
+        Field declaredField = tClass.getDeclaredField(fieldName);
+        declaredField.setAccessible(true);
+        return (T) declaredField.get(null);
     }
 
     /**
@@ -205,27 +219,34 @@ public class ReflectUtils {
      * @param <T>
      * @return
      */
-    public static <T> T getField(Object instance, String fieldName) {
-        return getField(instance.getClass(), instance, fieldName);
-    }
-
-    public static <T> T getField(String className, Object instance, String fieldName) {
+    public static <T> T getFieldSlience(Object instance, String fieldName)  {
         try {
-            return getField(Class.forName(className), instance, fieldName);
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    public static <T> T getField(Class<?> clazz, Object instance, String fieldName) {
-        try {
-            Field field = clazz.getDeclaredField(fieldName);
-            field.setAccessible(true);
-            return (T) field.get(instance);
+            return getField(instance.getClass(), instance, fieldName);
         } catch (Exception e) {
             e.printStackTrace();
         }
         return null;
+    }
+    public static <T> T getFieldSlience(String className,Object instance, String fieldName)  {
+        try {
+            return getField(className, instance, fieldName);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public static <T> T getField(String className, Object instance, String fieldName) throws Exception {
+        return getField(Class.forName(className), instance, fieldName);
+    }
+
+    public static <T> T getField(Object instance, String fieldName) throws Exception {
+        return getField(instance.getClass(), instance, fieldName);
+    }
+
+    public static <T> T getField(Class<?> clazz, Object instance, String fieldName) throws Exception {
+        Field field = clazz.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return (T) field.get(instance);
     }
 }
