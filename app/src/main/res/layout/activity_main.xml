@@ -24,8 +24,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:onClick="startPluginFragment"
-        android:text="启动B插件Fragment"
+        android:onClick="loadPluginFragment"
+        android:text="加载插件Fragment"
         android:textAllCaps="false" />
 
     <Button

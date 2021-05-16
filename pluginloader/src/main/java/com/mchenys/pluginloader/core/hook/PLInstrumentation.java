@@ -19,6 +19,7 @@ import android.util.Log;
 import com.mchenys.pluginloader.core.Constants;
 import com.mchenys.pluginloader.core.LoadedPlugin;
 import com.mchenys.pluginloader.core.PluginManager;
+import com.mchenys.pluginloader.core.ResourcesManager;
 import com.mchenys.pluginloader.utils.PluginUtil;
 import com.mchenys.pluginloader.utils.ReflectUtils;
 
@@ -89,11 +90,17 @@ public class PLInstrumentation extends Instrumentation {
             } catch (Exception exception) {
                 exception.printStackTrace();
             }
-
             return newActivity(activity);
         }
-
-        return newActivity(mBase.newActivity(cl, className, intent));
+        Activity hostActivity = newActivity(mBase.newActivity(cl, className, intent));
+        if (null != ResourcesManager.mCombineResource) {
+            try {
+                ReflectUtils.setField(Class.forName("android.view.ContextThemeWrapper"), hostActivity, "mResources", ResourcesManager.mCombineResource);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return hostActivity;
     }
 
     @Override
@@ -110,9 +117,9 @@ public class PLInstrumentation extends Instrumentation {
     }
 
     protected void injectActivity(Activity activity) {
-        // 此Activity是插件的Activity
         final Intent intent = activity.getIntent();
         if (PluginUtil.isIntentFromPlugin(intent)) {
+            // 插件Activity 处理
             try {
                 LoadedPlugin plugin = this.mPluginManager.getLoadedPlugin(intent);
                 // 修改ContextWrapper的mBase
@@ -137,6 +144,14 @@ public class PLInstrumentation extends Instrumentation {
 
             } catch (Exception e) {
                 Log.w(TAG, e);
+            }
+        }else {
+            if (null != ResourcesManager.mCombineResource) {
+                try {
+                    ReflectUtils.setField(Class.forName("android.view.ContextThemeWrapper"), activity, "mResources", ResourcesManager.mCombineResource);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
     }

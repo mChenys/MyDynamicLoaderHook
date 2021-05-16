@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
@@ -22,6 +23,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -30,6 +32,7 @@ import com.mchenys.pluginloadbyhook.bean.PluginItem;
 import com.mchenys.pluginloader.core.Constants;
 import com.mchenys.pluginloader.core.LoadedPlugin;
 import com.mchenys.pluginloader.core.PluginManager;
+import com.mchenys.pluginloader.core.ResourcesManager;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -77,14 +80,15 @@ public class MainActivity extends AppCompatActivity {
 
 
     // 启动插件Fragment
-    public void startPluginFragment(View view) {
-     /*
-        int result = PluginManager.getInstance().startPluginFragment(this, new DyIntent("com.bonade.pluginb", "com.bonade.pluginb.fragment.MainFragment"));
-        if (result == DyConstants.StartResult.START_RESULT_SUCCESS) {
-            Toast.makeText(this, "启动成功", Toast.LENGTH_SHORT).show();
-        } else {
-            Toast.makeText(this, "启动失败,result=" + result, Toast.LENGTH_SHORT).show();
-        }*/
+    public void loadPluginFragment(View view) {
+        Fragment fragment = PluginManager.getInstance().getPluginFragment("com.mchenys.plugina", "com.mchenys.plugina.AFragment");
+        if (null == fragment) {
+            Toast.makeText(this, "创建失败", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        getSupportFragmentManager().beginTransaction().replace(R.id.fl_container, fragment)
+                .commitAllowingStateLoss();
+
     }
 
     // 扫描+加载插件
@@ -222,46 +226,25 @@ public class MainActivity extends AppCompatActivity {
                 itemView.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        String packageName = item.packageInfo.packageName;
-                        startPlugin(packageName, launcherActivityName);
+                        Intent intent = new Intent();
+                        intent.setClassName(MainActivity.this, launcherActivityName);
+                        startActivity(intent);
                     }
                 });
                 uninstallBtn.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        int result = PluginManager.getInstance().uninstallPlugin(item.packageInfo.packageName);
-                        if (result == Constants.RESULT_SUCCESS) {
+                        boolean result = PluginManager.getInstance().uninstallPlugin(item.packageInfo.packageName);
+                        if (result) {
                             mData.remove(item);
                             mRecyclerView.getAdapter().notifyItemRemoved(getAdapterPosition());
                             Toast.makeText(MainActivity.this, "卸载成功", Toast.LENGTH_SHORT).show();
                         } else {
-                            Toast.makeText(MainActivity.this, "卸载失败,result=" + result, Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "卸载失败", Toast.LENGTH_SHORT).show();
                         }
                     }
                 });
             }
         }
-    }
-
-
-    private void startPlugin(String packageName, String launcherActivityName) {
-       /* PluginManager pluginManager = PluginManager.getInstance();
-        int code = pluginManager.startPluginActivity(MainActivity.this, new DyIntent(packageName, launcherActivityName));
-        switch (code) {
-            case DyConstants.StartResult.START_RESULT_SUCCESS:
-                Toast.makeText(MainActivity.this, "启动成功", Toast.LENGTH_SHORT).show();
-                break;
-            case DyConstants.StartResult.START_RESULT_NO_PKG:
-                Toast.makeText(MainActivity.this, "无效的插件包", Toast.LENGTH_SHORT).show();
-
-                break;
-            case DyConstants.StartResult.START_RESULT_NO_CLASS:
-                Toast.makeText(MainActivity.this, "找不到插件类", Toast.LENGTH_SHORT).show();
-
-                break;
-            case DyConstants.StartResult.START_RESULT_CLASS_IS_NO_PLUGIN_ERROR:
-                Toast.makeText(MainActivity.this, "插件类不合法,请检查是否继承了PluginActivity或者PluginFragmentActivity", Toast.LENGTH_SHORT).show();
-                break;
-        }*/
     }
 }

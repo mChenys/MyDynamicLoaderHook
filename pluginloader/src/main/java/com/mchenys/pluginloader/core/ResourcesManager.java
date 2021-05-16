@@ -18,7 +18,7 @@ import java.util.List;
  * @Description: 资源管理类
  */
 public class ResourcesManager {
-
+    public static Resources mCombineResource;
     /**
      * 创建合并后的Resources
      *
@@ -74,6 +74,7 @@ public class ResourcesManager {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        mCombineResource = hostResources;
         return hostResources;
     }
 }

@@ -8,9 +8,11 @@ import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.os.Bundle;
 import android.os.Looper;
+import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.WorkerThread;
+import androidx.fragment.app.Fragment;
 
 import com.mchenys.pluginloader.core.hook.Android10_11Hook;
 import com.mchenys.pluginloader.core.hook.Android5_7Hook;
@@ -19,7 +21,6 @@ import com.mchenys.pluginloader.core.hook.IAndroidHook;
 import com.mchenys.pluginloader.core.hook.PLInstrumentation;
 import com.mchenys.pluginloader.utils.PluginUtil;
 import com.mchenys.pluginloader.utils.ReflectUtils;
-import com.mchenys.pluginloader.utils.RunUtils;
 import com.mchenys.pluginloader.utils.VersionUtils;
 
 import java.io.File;
@@ -40,7 +41,7 @@ public class PluginManager {
 
     private static final PluginManager sInstance = new PluginManager();
     // 缓存已加载的插件包
-    private final Map<String, LoadedPlugin> mPlugins = new ConcurrentHashMap<>();
+    private final Map<String, LoadedPlugin> mLoadedPluginMap = new ConcurrentHashMap<>();
     private Context mContext;
     private Application mApplication;
     private ComponentsHandler mComponentsHandler;
@@ -57,7 +58,7 @@ public class PluginManager {
     }
 
     public Map<String, LoadedPlugin> getLoadedPlugins() {
-        return mPlugins;
+        return mLoadedPluginMap;
     }
 
     /**
@@ -157,16 +158,7 @@ public class PluginManager {
      * @param callback
      */
     public void addPlugin(File file, PluginLoadCallback callback) {
-        try {
-            // 先copy到私有目录
-            File dest = new File(mPluginApkDir, file.getName());
-            PluginUtil.copy(file, dest, true);
-            if (dest.exists() && dest.length() > 0) {
-                loadPlugin(dest, true, callback);
-            }
-        } catch (Exception e) {
-            if (null != callback) callback.onError(e.getMessage());
-        }
+        loadPlugin(file, true, callback);
     }
 
     /**
@@ -202,9 +194,20 @@ public class PluginManager {
             @Override
             public void run() {
                 try {
-                    LoadedPlugin loadedPlugin = LoadedPlugin.create(PluginManager.this, mContext, file, forceLoad);
-                    if (null != callback) {
-                        callback.onComplete(loadedPlugin);
+                    File destFile = file;
+                    if (!file.getParentFile().getAbsolutePath().equals(mPluginApkDir.getAbsolutePath())) {
+                        // 先copy到私有目录
+                        destFile = new File(mPluginApkDir, file.getName());
+                        PluginUtil.copy(file, destFile, true);
+
+                    }
+                    if (null != destFile && destFile.exists() && destFile.length() > 0) {
+                        LoadedPlugin loadedPlugin = LoadedPlugin.create(PluginManager.this, mContext, destFile, forceLoad);
+                        if (null != callback) {
+                            callback.onComplete(loadedPlugin);
+                        }
+                    } else {
+                        if (null != callback) callback.onError("无效的插件包");
                     }
                 } catch (Exception e) {
                     if (null != callback) callback.onError(e.getMessage());
@@ -244,7 +247,7 @@ public class PluginManager {
      */
     public List<LoadedPlugin> getAllLoadedPlugins() {
         List<LoadedPlugin> list = new ArrayList<>();
-        list.addAll(mPlugins.values());
+        list.addAll(mLoadedPluginMap.values());
         return list;
     }
 
@@ -260,7 +263,7 @@ public class PluginManager {
     }
 
     public LoadedPlugin getLoadedPlugin(String packageName) {
-        return this.mPlugins.get(packageName);
+        return this.mLoadedPluginMap.get(packageName);
     }
 
     /**
@@ -280,7 +283,7 @@ public class PluginManager {
     }
 
     public ResolveInfo resolveActivity(Intent intent, int flags) {
-        for (LoadedPlugin plugin : this.mPlugins.values()) {
+        for (LoadedPlugin plugin : this.mLoadedPluginMap.values()) {
             // 获取对应插件的ResolveInfo
             ResolveInfo resolveInfo = plugin.resolveActivity(intent, flags);
             if (null != resolveInfo) {
@@ -290,7 +293,49 @@ public class PluginManager {
         return null;
     }
 
-    public int uninstallPlugin(String packageName) {
-        return 0;
+    /**
+     * 卸载插件
+     *
+     * @param packageName
+     * @return true 成功 ，false 失败
+     */
+    public boolean uninstallPlugin(String packageName) {
+        if (TextUtils.isEmpty(packageName)) {
+            return false;
+        }
+        LoadedPlugin loadedPlugin = mLoadedPluginMap.get(packageName);
+        if (loadedPlugin == null) {
+            return true;
+        }
+        File pluginFile = new File(loadedPlugin.mLocation);
+        boolean success = pluginFile.delete();
+        if (success) {
+            mLoadedPluginMap.remove(packageName);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 获取插件的Fragment
+     *
+     * @param packageName
+     * @param className
+     * @return
+     */
+    public Fragment getPluginFragment(String packageName, String className) {
+        LoadedPlugin loadedPlugin = mLoadedPluginMap.get(packageName);
+        if (null != loadedPlugin) {
+            try {
+                if (Constants.COMBINE_CLASSLOADER) {
+                    return (Fragment) Class.forName(className).newInstance();
+                } else {
+                    return (Fragment) Class.forName(className, true, loadedPlugin.mClassLoader).newInstance();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return null;
     }
 }
