@@ -274,13 +274,14 @@ public class PluginManager {
         return this.mComponentsHandler;
     }
 
-    // 根据intent去收集需要启动的activity的信息
+    // 根据intent去获取对应的ResolveInfo
     public ResolveInfo resolveActivity(Intent intent) {
         return this.resolveActivity(intent, 0);
     }
 
     public ResolveInfo resolveActivity(Intent intent, int flags) {
         for (LoadedPlugin plugin : this.mPlugins.values()) {
+            // 获取对应插件的ResolveInfo
             ResolveInfo resolveInfo = plugin.resolveActivity(intent, flags);
             if (null != resolveInfo) {
                 return resolveInfo;

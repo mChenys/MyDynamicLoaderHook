@@ -71,7 +71,7 @@ public class MainActivity extends AppCompatActivity {
     // 启动插件Activity
     public void startPluginActivity(View view) {
         Intent intent = new Intent();
-        intent.setComponent(new ComponentName("com.mchenys.plugina", "com.mchenys.plugina.MainActivity"));
+        intent.setClassName(this, "com.mchenys.plugina.MainActivity");
         startActivity(intent);
     }
 

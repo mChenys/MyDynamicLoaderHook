@@ -46,6 +46,7 @@ public class ComponentsHandler {
         ComponentName component = intent.getComponent();
         if (component == null
                 || component.getPackageName().equals(mHostContext.getPackageName())) {
+            // 根据intent获取插件包的ResolveInfo
             ResolveInfo info = mPluginManager.resolveActivity(intent);
             if (info != null && info.activityInfo != null) {
                 component = new ComponentName(info.activityInfo.packageName, info.activityInfo.name);

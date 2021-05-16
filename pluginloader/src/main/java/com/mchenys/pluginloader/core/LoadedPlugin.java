@@ -406,15 +406,23 @@ public class LoadedPlugin {
         return query.get(0);
     }
 
-
+    /**
+     * 根据intent查询List<ResolveInfo>
+     * @param intent
+     * @param flags
+     * @return
+     */
     public List<ResolveInfo> queryIntentActivities(Intent intent, int flags) {
+        // 从入参中的到ComponentName
         ComponentName component = intent.getComponent();
         List<ResolveInfo> resolveInfos = new ArrayList<ResolveInfo>();
         ContentResolver resolver = this.mPluginContext.getContentResolver();
 
         if (null != component) {
+            // 遍历缓存
             for (Map.Entry<ComponentName, ActivityInfo> entry : mActivityInfos.entrySet()) {
                 ComponentName source = entry.getKey();
+                // 对比缓存和传入的component
                 if (match(source, component)) {
                     ResolveInfo resolveInfo = new ResolveInfo();
                     resolveInfo.activityInfo = entry.getValue();
